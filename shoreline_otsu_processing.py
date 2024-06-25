@@ -121,7 +121,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         return (pdf, x_grid)
 
     @classmethod
-    def extract( cls, stationInfo, rmb, maskedImg, threshInfo):
+    def extract( cls, stationInfo, rmb, threshInfo):
         # Uses otsu's threshold to find shoreline points based on water orientation.
         stationname = stationInfo['Station Name']
         slTransects = stationInfo['Shoreline Transects']
@@ -416,7 +416,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         }
 
         # Generates final json and figure for shoreline products.
-        ( tranSL, slVars ) = cls.extract(stationInfo, rmb, maskedImg, threshInfo)
+        ( tranSL, slVars ) = cls.extract(stationInfo, rmb, threshInfo)
         fig_tranSL = cls.pltFig_tranSL(stationInfo, resized_image, tranSL)
 
         return ( tranSL, fig_tranSL, slVars )
