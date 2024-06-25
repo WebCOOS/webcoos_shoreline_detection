@@ -4,7 +4,7 @@ import hashlib
 import filetype
 
 
-def namify_for_content( b: bytes ) -> Tuple[str,str]:
+def namify_for_content( b: bytes ) -> Tuple[str, str]:
 
     assert b
 

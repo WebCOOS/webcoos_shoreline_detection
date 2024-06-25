@@ -16,13 +16,13 @@ import cv2
 from datetime import datetime, timezone
 from itertools import chain
 import json
-import math
+# import math
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 import os
 from PIL import Image, ImageDraw
-import re
+# import re
 import scipy.signal as signal
 from skimage.filters import threshold_otsu
 from skimage.measure import profile_line
@@ -107,14 +107,14 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         xt = np.asarray(transects['x'])
         yt = np.asarray(transects['y'])
         n = len(xt)
-        imProf = [profile_line(rmb, (yt[i,1], xt[i,1]), (yt[i,0], xt[i,0]), mode='constant') for i in range(n)]
+        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(n)]
         improfile = np.concatenate(imProf)[~np.isnan(np.concatenate(imProf))]
         return improfile
 
     @classmethod
     def ksdensity( cls, P, **kwargs):
         # Univariate kernel density estimation.
-        x_grid = np.linspace(P.max(), P.min(), 1000) # Could cache this.
+        x_grid = np.linspace(P.max(), P.min(), 1000)  # Could cache this.
         kde = KDEUnivariate(P)
         kde.fit(**kwargs)
         pdf = kde.evaluate(x_grid)
@@ -154,7 +154,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 y = yMax-yMin
                 yList[i] = np.zeros(shape=y)
                 val = [0]*(yMax-yMin)
-                for j in range(0,len(val)):
+                for j in range(0, len(val)):
                     k = yMin + j
                     val[j] = rmb[k][x]
                 val = np.array(val)
@@ -180,9 +180,9 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                     Pts[i] = (xPt[i], yPt[i])
                 # Calculates the average value in a 21x21 sample around point.
                 areaAvg = [0]*len(Pts)
-                sample = np.zeros((21,21))
+                sample = np.zeros((21, 21))
 
-                for i in range(0,len(Pts)):
+                for i in range(0, len(Pts)):
                     if Pts[i] == 0:
                         pass
                     else:
@@ -199,7 +199,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 # Removes points that fall outside a sample range.
                 buffer = (float(thresh_otsu) * .20)
                 exc = {0}
-                for i in range(0,len(Pts)):
+                for i in range(0, len(Pts)):
                     if abs((buffer + thresh_otsu)) > abs(areaAvg[i]) > abs((buffer - thresh_otsu)):
                         pass
                     else:
@@ -213,7 +213,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 # Stores the shoreline points array.
                 threshX = np.array(threshX)
                 threshY = np.array(threshY)
-                shoreline = np.vstack((threshX,threshY)).T
+                shoreline = np.vstack((threshX, threshY)).T
 
         else:
             def find_intersect(List, thresh):
@@ -225,7 +225,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 y = int(yt[i][0])
                 yList[i] = np.full(shape=xMax, fill_value= y)
                 xList[i] = np.arange(xMax)
-                values[i] =rmb[y][0:xMax]
+                values[i] = rmb[y][0:xMax]
                 revValues[i] = rmb[y][::-1]
 
             intersect = [0]*len(yt)
@@ -246,9 +246,9 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                     yPt[i] = int(yt[i][0])
                     Pts[i] = (xPt[i], yPt[i])
                 areaAvg = [0]*len(Pts)
-                sample = np.zeros((21,21))
+                sample = np.zeros((21, 21))
 
-                for i in range(0,len(Pts)):
+                for i in range(0, len(Pts)):
                     if Pts[i] == 0:
                         pass
                     else:
@@ -264,7 +264,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                         areaAvg[i] = np.mean(sample)
                 buffer = (float(thresh_otsu) * .20)
                 exc = {0}
-                for i in range(0,len(Pts)):
+                for i in range(0, len(Pts)):
                     if abs((buffer + thresh_otsu)) > abs(areaAvg[i]) > abs((buffer - thresh_otsu)):
                         pass
                     else:
@@ -277,26 +277,26 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                     threshY[i] = truePts[i][1]
                 threshX = np.array(threshX)
                 threshY = np.array(threshY)
-                shoreline = np.vstack((threshX,threshY)).T
+                shoreline = np.vstack((threshX, threshY)).T
 
         slVars = {
-            'Station Name':stationname,
-            'Date':str(date),
-            'Time Info':str(dtInfo),
-            'Thresh':thresh,
-            'Otsu Threshold':thresh_otsu,
+            'Station Name': stationname,
+            'Date': str(date),
+            'Time Info': str(dtInfo),
+            'Thresh': thresh,
+            'Otsu Threshold': thresh_otsu,
             'Shoreline Transects': slTransects,
-            'Threshold Weightings':thresh_weightings,
-            'Shoreline Points':shoreline
+            'Threshold Weightings': thresh_weightings,
+            'Shoreline Points': shoreline
         }
 
         try:
             del slVars['Time Info']['DateTime Object (UTC)']
             del slVars['Time Info']['DateTime Object (LT)']
-        except:
+        except Exception:
             pass
 
-        if type(slVars['Shoreline Transects']['x']) == np.ndarray:
+        if isinstance( slVars['Shoreline Transects']['x'], np.ndarray ):
             slVars['Shoreline Transects']['x'] = slVars['Shoreline Transects']['x'].tolist()
             slVars['Shoreline Transects']['y'] = slVars['Shoreline Transects']['y'].tolist()
         else:
@@ -317,12 +317,12 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
     def pltFig_tranSL( cls, stationInfo, photo, tranSL):
         # Creates shoreline product.
         stationname = stationInfo['Station Name']
-        dtInfo = stationInfo['Datetime Info']
-        date = str(dtInfo.date())
-        time = str(dtInfo.hour) + str(dtInfo.minute)
+        # dtInfo = stationInfo['Datetime Info']
+        # date = str(dtInfo.date())
+        # time = str(dtInfo.hour) + str(dtInfo.minute)
         Di = stationInfo['Dune Line Info']
         duneInt = Di['Dune Line Interpolation']
-        xi, py = duneInt[:,0], duneInt[:,1]
+        xi, py = duneInt[:, 0], duneInt[:, 1]
         plt.ioff()
         fig_tranSL = plt.figure()
         plt.imshow(photo, interpolation='nearest')
@@ -348,7 +348,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         return(fig_tranSL)
 
     @classmethod
-    def getTimexShoreline(cls, config_folder: Union[str,Path], stationName, frame):
+    def getTimexShoreline(cls, config_folder: Union[str, Path], stationName, frame):
         # Main program.
 
         assert config_folder is not None
@@ -388,7 +388,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         maskedImg = cls.mapROI(stationInfo, resized_image)
 
         # Computes rmb.
-        rmb = maskedImg[:,:,0] - maskedImg[:,:,2]
+        rmb = maskedImg[:, :, 0] - maskedImg[:, :, 2]
         P = cls.improfile(rmb, stationInfo).reshape(-1, 1)
 
         # Computing probability density function and finds threshold points.
@@ -402,13 +402,17 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         J1, = np.where(peakVals[:] == np.max(peakVals[I1]))
         I2 = np.asarray(np.where(peakLocs > thresh_otsu))
         J2, = np.where(peakVals[:] == np.max(peakVals[I2]))
-        thresh = (thresh_weightings[0]*peakLocs[J1] +
-                thresh_weightings[0]*peakLocs[J2])
+        thresh = (
+            thresh_weightings[0]
+            * peakLocs[J1]
+            + thresh_weightings[0]
+            * peakLocs[J2]
+        )
         thresh = float(thresh[0])
         threshInfo = {
-            'Thresh':thresh,
-            'Otsu Threshold':thresh_otsu,
-            'Threshold Weightings':thresh_weightings
+            'Thresh': thresh,
+            'Otsu Threshold': thresh_otsu,
+            'Threshold Weightings': thresh_weightings
         }
 
         # Generates final json and figure for shoreline products.
