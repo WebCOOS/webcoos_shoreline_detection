@@ -332,9 +332,13 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         plt.tick_params(axis='both', which='minor', labelsize=8)
         plt.plot(tranSL[:, 0], tranSL[:, 1], color='r', linewidth=2, label='Detected Shoreline')
         plt.plot(xi, py, color='blue', linewidth=2, label='Baseline', zorder=4)
-        plt.title(('Transect Based Shoreline Detection (Time Averaged)\n' + stationname +
-                ' on ' + date + ' at ' + time[:2] + ':' +
-                time[2:] + ' UTC'), fontsize = 12)
+        plt.title(
+            (
+                'Transect Based Shoreline Detection (Time Averaged)\n'
+                + stationname
+            ),
+            fontsize = 12
+        )
         plt.legend(prop={'size': 9})
         plt.tight_layout()
 
