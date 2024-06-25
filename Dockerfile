@@ -41,6 +41,9 @@ ENV PATH "$MAMBA_ROOT_PREFIX/bin:$PATH"
 
 # Copy Python app files
 COPY --chown=mambauser:mambauser *.py /app/
+# Embed the known station/shoreline file names within the image
+RUN mkdir -p /app/cfg && chown mambauser:mambauser /app/cfg
+COPY --chown=mambauser:mambauser cfg/*.json /app/cfg/
 
 # Copy container-specific configuration
 COPY --chown=mambauser:mambauser docker /docker/

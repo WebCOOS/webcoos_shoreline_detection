@@ -84,7 +84,7 @@ async def index():
 )
 def shoreline_otsu_from_upload(
     request: Request,
-    model: MethodName,
+    method: MethodName,
     version: ShorelineOtsuVersion,
     shoreline_name: Shoreline,
     file: UploadFile,
@@ -98,10 +98,10 @@ def shoreline_otsu_from_upload(
     assert ext in ALLOWED_IMAGE_EXTENSIONS, \
         f"{ext} not in allowed image file types: {repr(ALLOWED_IMAGE_EXTENSIONS)}"
 
-    ( res_path, detection_result ) = shoreline_otsu_process_image(
+    ( plot_res_path, json_res_path, detection_result ) = shoreline_otsu_process_image(
         shoreline_method,
         output_path,
-        model,
+        method,
         version,
         shoreline_name,
         name,

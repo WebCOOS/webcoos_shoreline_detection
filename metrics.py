@@ -10,27 +10,17 @@ from method_version import (
     MethodName,
     ShorelineOtsuVersion,
 )
+from shorelines import Shoreline
 
 
-OBJECT_CLASSIFICATION_DETECTION_COUNTER = Counter(
-    'object_classification_detection_counter',
-    'Overall count of inputs with successful detections (that meet a threshold)',
+SHORELINE_DETECTION_COUNTER = Counter(
+    'shoreline_detection_counter',
+    'Overall count of inputs against a specific shoreline',
     [
-        'model_framework',
-        'model_name',
-        'model_version',
-        'classification_name',
-    ]
-)
-
-OBJECT_CLASSIFICATION_OBJECT_COUNTER = Counter(
-    'object_classification_object_counter',
-    'Count of detected objects in all inputs (that meet a threshold)',
-    [
-        'model_framework',
-        'model_name',
-        'model_version',
-        'classification_name',
+        'method_framework',
+        'method_name',
+        'method_version',
+        'shoreline_name',
     ]
 )
 
@@ -41,29 +31,22 @@ OBJECT_CLASSIFICATION_OBJECT_COUNTER = Counter(
 #
 #       c.labels('get', '/')
 
-LABELS = [
+SHORELINES = [
     (
-        MethodFramework.ultralytics,
+        MethodFramework.skimage,
         MethodName.shoreline_otsu,
-        ShorelineOtsuVersion.v8n,
-        oc.value
-    ) for oc in YOLOModelObjectClassification
+        ShorelineOtsuVersion.v1,
+        sl.value
+    ) for sl in Shoreline
 ]
 
-for ( fw, mdl, ver, cls_name ) in LABELS:
+for ( fw, mdl, ver, sl_name ) in SHORELINES:
     # Initialize counters
-    OBJECT_CLASSIFICATION_DETECTION_COUNTER.labels(
+    SHORELINE_DETECTION_COUNTER.labels(
         fw.name,
         mdl.value,
         ver.value,
-        cls_name,
-    )
-
-    OBJECT_CLASSIFICATION_OBJECT_COUNTER.labels(
-        fw.name,
-        mdl.value,
-        ver.value,
-        cls_name,
+        sl_name,
     )
 
 
@@ -73,29 +56,15 @@ def make_metrics_app():
     return make_asgi_app( registry = registry )
 
 
-def increment_detection_counter(
+def increment_shoreline_counter(
     fw: str,
-    mdl_name: str,
-    mdl_version: str,
-    cls_name: str
+    mth_name: str,
+    mth_version: str,
+    shoreline_name: str
 ):
-    OBJECT_CLASSIFICATION_DETECTION_COUNTER.labels(
+    SHORELINE_DETECTION_COUNTER.labels(
         fw,
-        mdl_name,
-        mdl_version,
-        cls_name
-    ).inc()
-
-
-def increment_object_counter(
-    fw: str,
-    mdl_name: str,
-    mdl_version: str,
-    cls_name: str
-):
-    OBJECT_CLASSIFICATION_OBJECT_COUNTER.labels(
-        fw,
-        mdl_name,
-        mdl_version,
-        cls_name
+        mth_name,
+        mth_version,
+        shoreline_name
     ).inc()

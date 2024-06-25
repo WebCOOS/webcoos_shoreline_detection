@@ -5,7 +5,7 @@ services:
       context:      .
       dockerfile:   Dockerfile
     ports:
-     - 8000:8000
+     - 8778:8000
     tmpfs:
      - "/outputs"
     environment:

@@ -9,11 +9,11 @@ from method_version import (
     ShorelineOtsuVersion,
 )
 from shorelines import Shoreline
-from metrics import increment_detection_counter, increment_object_counter
+from metrics import increment_shoreline_counter
 
 # From getTimexShoreline
 import cv2
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import chain
 import json
 import math
@@ -30,14 +30,10 @@ from statsmodels.nonparametric.kde import KDEUnivariate
 import logging
 
 logger = logging.getLogger( __name__ )
-width = 896
-height = 896
-threshold = 0.3
-font = cv2.FONT_HERSHEY_SIMPLEX
 
-MODEL_FOLDER = Path(os.environ.get(
-    "MODEL_DIRECTORY",
-    str(Path(__file__).parent)
+CFG_FOLDER = Path(os.environ.get(
+    "CFG_DIRECTORY",
+    str(Path(__file__).parent / 'cfg')
 ))
 
 
@@ -56,14 +52,27 @@ class AbstractShorelineImplementation(object):
 
 class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
-    def __init__(self) -> None:
-        pass
+    config_folder: str
+
+    def __init__(self, config_folder: str ) -> None:
+
+        assert config_folder
+        assert Path( config_folder ).exists(), f"{config_folder} must exist"
+        assert Path( config_folder ).is_dir(), f"{config_folder} must be dir"
+        self.config_folder = config_folder
+
+        return
 
     @classmethod
-    def getStationInfo( cls, ssPath):
+    def getStationInfo( cls, ssPath ):
+
+        stationInfo = None
         # Loads json and converts data to NumPy arrays.
         with open(ssPath, 'r') as setupFile:
             stationInfo = json.load(setupFile)
+
+        assert stationInfo
+
         stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
         stationInfo['Shoreline Transects']['x'] = np.asarray(stationInfo['Shoreline Transects']['x'])
         stationInfo['Shoreline Transects']['y'] = np.asarray(stationInfo['Shoreline Transects']['y'])
@@ -326,18 +335,34 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         return(fig_tranSL)
 
     @classmethod
-    def getTimexShoreline(cls, stationName, imgName):
+    def getTimexShoreline(cls, config_folder: Union[str,Path], stationName, frame):
         # Main program.
-        cwd = os.getcwd()
-        stationPath = os.path.join(cwd, stationName + '.config.json')
-        stationInfo = cls.getStationInfo(stationPath)
-        dtObj = datetime.strptime(re.sub(r'\D', '', imgName), '%Y%m%d%H%M%S')
+
+        assert config_folder is not None
+        assert isinstance( config_folder, ( str, Path ) )
+
+        if isinstance( config_folder, str ):
+            config_folder = Path( config_folder )
+
+        # Check to make sure that this is one of the shorelines we're handling
+        stationName_enum = Shoreline( stationName )
+
+        stationPath = Path( config_folder ) / f"{stationName_enum.value}.config.json"
+
+        stationInfo = cls.getStationInfo( stationPath)
+        # TODO: Not sure how to handle date/time here, as previous implementation
+        # relied on the name of the file object. Use 'now', for now.
+
+        # dtObj = datetime.strptime(re.sub(r'\D', '', imgName), '%Y%m%d%H%M%S')
+        dtObj = datetime.now( tz=timezone.utc )
         stationInfo['Datetime Info'] = dtObj
 
         # Converts image color scale.
         #new_size = (int(image.shape[1] * 0.3), int(image.shape[0] * 0.3))
         #resized_image = cv2.resize(image, new_size, interpolation=cv2.INTER_AREA)
-        photoAvg = cv2.cvtColor(cv2.imread(imgName), cv2.COLOR_BGR2RGB)
+
+        photoAvg = frame
+
         new_size = (int(photoAvg.shape[1] * 0.3), int(photoAvg.shape[0] * 0.3))
         resized_image = cv2.resize(photoAvg, new_size, interpolation=cv2.INTER_AREA)
 
@@ -379,10 +404,10 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
         return(tranSL, fig_tranSL)
 
-    @classmethod
-    def get_shoreline(cls, stationName, frame ):
+    def get_shoreline( self, stationName, frame ):
 
-        return cls.getTimexShoreline(
+        return self.__class__.getTimexShoreline(
+            self.config_folder,
             stationName,
             frame
         )
@@ -392,7 +417,9 @@ SKIMAGE_METHODS = {
     # public-facing model name
     "shoreline_otsu": {
         # public-facing model version
-        "v1": ShorelineOtsuMethodV1Implementation()
+        "v1": ShorelineOtsuMethodV1Implementation(
+            config_folder=CFG_FOLDER
+        )
     }
 }
 
@@ -447,15 +474,24 @@ def shoreline_otsu_process_image(
 
     npdata = np.asarray(bytearray(bytedata), dtype="uint8")
     frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
-    # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-    img_boxes = frame
+    # img_boxes = frame
 
     results = shoreline_method.get_shoreline(
         shoreline_name,
         frame
     )
 
-    raise NotImplementedError( 'Not yet implemented')
+    increment_shoreline_counter(
+        MethodFramework.skimage.value,
+        MethodName.shoreline_otsu.value,
+        ShorelineOtsuVersion.v1.value,
+        shoreline_name
+    )
+
+    ret = None
+
+    # TODO: Parse results, return a tuple of result paths and objects
 
     return ( 'output_plt_file', 'output_json_file', ret )
