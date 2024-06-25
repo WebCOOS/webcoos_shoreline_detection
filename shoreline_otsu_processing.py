@@ -1,8 +1,8 @@
 import os
-from typing import List, Set, Union
+from typing import Union
 import numpy as np
 from pathlib import Path
-from result import ShorelineDetectionResult, BoundingBoxPoint
+from result import ShorelineDetectionResult
 from method_version import (
     MethodFramework,
     MethodName,
@@ -18,6 +18,7 @@ from itertools import chain
 import json
 import math
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 import os
 from PIL import Image, ImageDraw
@@ -72,6 +73,8 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
             stationInfo = json.load(setupFile)
 
         assert stationInfo
+        assert 'Dune Line Info' in stationInfo
+        assert 'Shoreline Transects' in stationInfo
 
         stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
         stationInfo['Shoreline Transects']['x'] = np.asarray(stationInfo['Shoreline Transects']['x'])
@@ -300,10 +303,15 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
             pass
 
         slVars['Shoreline Points'] = slVars['Shoreline Points'].tolist()
-        fname = (stationname + '.' + datetime.strftime(dtInfo,'%Y-%m-%d_%H%M') + '.avg.slVars.json')
-        with open(fname, "w") as f:
-            json.dump(slVars, f)
-        return(shoreline)
+
+        # JAR: Don't emit the JSON file here, instead return the slVars to the
+        # calling function along with the shoreline points.
+
+        # fname = (stationname + '.' + datetime.strftime(dtInfo,'%Y-%m-%d_%H%M') + '.avg.slVars.json')
+        # with open(fname, "w") as f:
+        #     json.dump(slVars, f)
+
+        return ( shoreline, slVars )
 
     @classmethod
     def pltFig_tranSL( cls, stationInfo, photo, tranSL):
@@ -324,14 +332,15 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         plt.tick_params(axis='both', which='minor', labelsize=8)
         plt.plot(tranSL[:, 0], tranSL[:, 1], color='r', linewidth=2, label='Detected Shoreline')
         plt.plot(xi, py, color='blue', linewidth=2, label='Baseline', zorder=4)
-        plt.title(('Transect Based Shoreline Detection (Time Averaged)\n' + stationname.capitalize() +
+        plt.title(('Transect Based Shoreline Detection (Time Averaged)\n' + stationname +
                 ' on ' + date + ' at ' + time[:2] + ':' +
                 time[2:] + ' UTC'), fontsize = 12)
         plt.legend(prop={'size': 9})
         plt.tight_layout()
-        saveName = (stationname + '.' + date + '_' + time + '.' + 'tranSL-avg.fix.jpeg')
-        plt.savefig(saveName, bbox_inches = 'tight', dpi=400)
-        plt.close()
+
+        # saveName = (stationname + '.' + date + '_' + time + '.' + 'tranSL-avg.fix.jpeg')
+        # plt.savefig(saveName, bbox_inches = 'tight', dpi=400)
+        # plt.close()
         return(fig_tranSL)
 
     @classmethod
@@ -399,10 +408,10 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         }
 
         # Generates final json and figure for shoreline products.
-        tranSL = cls.extract(stationInfo, rmb, maskedImg, threshInfo)
+        ( tranSL, slVars ) = cls.extract(stationInfo, rmb, maskedImg, threshInfo)
         fig_tranSL = cls.pltFig_tranSL(stationInfo, resized_image, tranSL)
 
-        return(tranSL, fig_tranSL)
+        return ( tranSL, fig_tranSL, slVars )
 
     def get_shoreline( self, stationName, frame ):
 
@@ -432,7 +441,7 @@ def shoreline_otsu_process_image(
     shoreline_name: Union[Shoreline, str],
     name: str,
     bytedata: bytes
-):
+) -> ShorelineDetectionResult:
 
     assert shoreline_method is not None, \
         f"Must have shoreline method passed to {shoreline_otsu_process_image.__name__}"
@@ -470,7 +479,18 @@ def shoreline_otsu_process_image(
         shoreline_name
     )
 
-    output_file = output_path / model / str(version) / name
+    output_file_jpg = (
+        output_path / model / version
+        / Path( f"{shoreline_name}.{name}" ).with_suffix(
+            '.transSL-avg.fix.jpg'
+        )
+    )
+
+    # Ensure that the directory to house the plotted figure exists
+    os.makedirs(
+        str( output_file_jpg.parent ),
+        exist_ok=True
+    )
 
     npdata = np.asarray(bytearray(bytedata), dtype="uint8")
     frame = cv2.imdecode(npdata, cv2.IMREAD_COLOR)
@@ -478,10 +498,21 @@ def shoreline_otsu_process_image(
 
     # img_boxes = frame
 
-    results = shoreline_method.get_shoreline(
+    ( _, fig_tranSL, slVars ) = shoreline_method.get_shoreline(
         shoreline_name,
         frame
     )
+
+    assert isinstance( fig_tranSL, Figure )
+
+    fig_tranSL.savefig(
+        output_file_jpg,
+        bbox_inches = 'tight',
+        dpi = 400
+    )
+
+    ret.detected_shoreline = slVars
+    ret.shoreline_plot_uri = str( output_file_jpg )
 
     increment_shoreline_counter(
         MethodFramework.skimage.value,
@@ -490,8 +521,4 @@ def shoreline_otsu_process_image(
         shoreline_name
     )
 
-    ret = None
-
-    # TODO: Parse results, return a tuple of result paths and objects
-
-    return ( 'output_plt_file', 'output_json_file', ret )
+    return ret

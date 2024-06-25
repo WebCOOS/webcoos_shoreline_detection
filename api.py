@@ -78,7 +78,7 @@ async def index():
 
 # YOLO object detection endpoints
 @app.post(
-    f"{SKIMAGE_ENDPOINT_PREFIX}/{{method}}/{{version}}/upload",
+    f"{SKIMAGE_ENDPOINT_PREFIX}/{{method}}/{{version}}/{{shoreline_name}}/upload",
     tags=['skimage'],
     summary="Shoreline Otsu shoreline prediction method against image upload",
 )
@@ -98,7 +98,7 @@ def shoreline_otsu_from_upload(
     assert ext in ALLOWED_IMAGE_EXTENSIONS, \
         f"{ext} not in allowed image file types: {repr(ALLOWED_IMAGE_EXTENSIONS)}"
 
-    ( plot_res_path, json_res_path, detection_result ) = shoreline_otsu_process_image(
+    detection_result = shoreline_otsu_process_image(
         shoreline_method,
         output_path,
         method,
@@ -108,13 +108,10 @@ def shoreline_otsu_from_upload(
         bytedata
     )
 
-    if( res_path is None ):
-        return annotation_image_and_detection_result(
-            None,
-            detection_result
-        )
-
-    rel_path = os.path.relpath( res_path, output_path )
+    rel_path = os.path.relpath(
+        detection_result.shoreline_plot_uri,
+        output_path
+    )
 
     url_path_for_output = rel_path
 
@@ -129,10 +126,9 @@ def shoreline_otsu_from_upload(
     finally:
         pass
 
-    return annotation_image_and_detection_result(
-        url_path_for_output,
-        detection_result
-    )
+    detection_result.shoreline_plot_uri = url_path_for_output
+
+    return detection_result
 
 
 @app.post("/health")
