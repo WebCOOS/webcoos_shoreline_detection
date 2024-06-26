@@ -131,6 +131,6 @@ def shoreline_otsu_from_upload(
     return detection_result
 
 
-@app.post("/health")
+@app.get("/health")
 def health():
     return { "health": "ok" }

@@ -22,6 +22,9 @@ dependencies:
   - pip
   # Testing related
   - flake8>=3.7.9
+  - pytest
+  - pytest-env
+  - httpx
   - pip:
     - imagecodecs>=2024.6.1,<2024.7
     - opencv-python-headless>=4.9.0.80,<4.10
