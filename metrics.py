@@ -11,6 +11,7 @@ from method_version import (
     ShorelineOtsuVersion,
 )
 from shorelines import Shoreline
+import os
 
 
 SHORELINE_DETECTION_COUNTER = Counter(
@@ -50,8 +51,19 @@ for ( fw, mdl, ver, sl_name ) in SHORELINES:
     )
 
 
+PROMETHEUS_MULTIPROC_DIR='PROMETHEUS_MULTIPROC_DIR'
+
 def make_metrics_app():
     registry = CollectorRegistry()
+
+    # Try to detect and provide default, suitable PROMETHEUS_MULTIPROC_DIR
+    # even if the environment variable isn't set.
+    pmd = os.getenv( PROMETHEUS_MULTIPROC_DIR, None )
+
+    if pmd is None:
+        pmd = '/tmp'
+        os.environ[ PROMETHEUS_MULTIPROC_DIR ] = pmd
+
     multiprocess.MultiProcessCollector( registry )
     return make_asgi_app( registry = registry )
 

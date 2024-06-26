@@ -2,9 +2,11 @@
 
 API for performing shoreline detection on pre-configured shoreline imagery.
 
-Developed by:
+Developed by and collaborated with:
 
-*   TODO
+*   Jeremy Braun (UNCW) (jeb2694@uncw.edu)
+*   Joseph Long (UNCW) (longjw@uncw.edu)
+*   Emily Tango-Lee (UNCW) (ejt4639@uncw.edu)
 
 ![Shoreline Example](example.jpg "Shoreline Example")
 
@@ -30,33 +32,53 @@ micromamba activate webcoos_shoreline_detection
 ## FastAPI Serving
 
 The models can be served using a FastAPI server. The server allows the POSTing
-of image URLs and raw image (file uploads). The model to use is supplied as URL path parameters.
+of raw image (file uploads) to run against an available shoreline detection
+method and set of known shoreline parameters.
+
+The method used for shoreline detection to use is supplied as URL path
+parameters, with the general endpoint scheme being the following:
 
 ```shell
-POST /{method_name}/{method_version}/upload - Image file upload endpoint
+ # Image file upload endpoint
+POST /{method_framework}/{method_name}/{method_version}/{shoreline_name}/upload
+
+# Example to upload an oak island image and to detect using the latest Otsu
+# method for shoreline detection (which uses scikit as a based framework).
+POST /skimage/shoreline_otsu/v1/oakisland_west/upload
 ```
 
-The server can be started with
+The server can be started with either:
 
 ```shell
-uvicorn api:app
+uvicorn api:app --port 8778
 ```
 
-The server can be tested with the `test_api.py` file. It will save images to the `output` folder based on the `model` and `version` requested.
+...or use `modd` (from [cortesi/modd](https://github.com/cortesi/modd))
 
 ```shell
-python ./test/test_api.py
+modd
 ```
 
-The FastAPI server can also be served using Docker:
+...or FastAPI server can also be served using Docker:
 
 ```shell
-docker build -t webcoos_shoreline_detection:latest .
-docker run --gpus all --rm --name shoreline_detector -v $(pwd)/outputs/docker:/outputs -p 8000:8000 webcoos_shoreline_detection
+docker compose up
 ```
 
-And then tested the same as running it outside of Docker
+### OpenAPI Spec / UI (Swagger)
+
+The FastAPI framework provides automatically generated
+[OpenAPI](https://spec.openapis.org/oas/v3.1.0) specifications for the
+endpoints and calling parameters for all endpoints within the service.
+
+The spec and the generated user interface for that spec can be viewed with the
+service running, accessible via <http://localhost:8778/docs>
+
+## Testing
+
+The FastAPI service can be tested with `pytest`, which will run the battery of unit and
+integration tests within the codebase.
 
 ```shell
-python ./test/test_api.py
+pytest
 ```

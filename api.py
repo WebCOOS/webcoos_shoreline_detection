@@ -39,7 +39,7 @@ ALLOWED_IMAGE_EXTENSIONS = (
 
 output_path = Path(os.environ.get(
     "OUTPUT_DIRECTORY",
-    str(Path(__file__).with_name('outputs') / 'fastapi')
+    str(Path(__file__).with_name('outputs'))
 ))
 
 

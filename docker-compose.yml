@@ -5,14 +5,16 @@ services:
       context:      .
       dockerfile:   Dockerfile
     ports:
-     - 8778:8000
+     - 8778:8778
     tmpfs:
      - "/outputs"
+    # volumes:
+    #  - "./outputs:/outputs:rw"
     environment:
      - OUTPUT_DIRECTORY=/outputs
     command: >
       gunicorn api:app
-        --bind "0.0.0.0:8000"
+        --bind "0.0.0.0:8778"
         --timeout 240
         -w 1 --max-requests 100
         -k uvicorn.workers.UvicornWorker

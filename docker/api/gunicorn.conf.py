@@ -1,7 +1,7 @@
 from prometheus_client import multiprocess
 
 proc_name = 'webcoos-shoreline-detector-api'
-bind = "0.0.0.0:8000"
+bind = "0.0.0.0:8778"
 workers = 4
 threads = 1
 worker_class = 'uvicorn.workers.UvicornWorker'
