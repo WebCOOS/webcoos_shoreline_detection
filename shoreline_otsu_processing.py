@@ -477,7 +477,7 @@ def shoreline_otsu_process_image(
 
     assert isinstance( shoreline_name, ( Shoreline, str ) )
 
-    if( isinstance( shoreline_name, ShorelineOtsuVersion ) ):
+    if( isinstance( shoreline_name, Shoreline ) ):
         shoreline_name = shoreline_name.value
 
     ret: ShorelineDetectionResult = ShorelineDetectionResult(
