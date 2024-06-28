@@ -14,7 +14,7 @@ dependencies:
   - prometheus_client
   # Computation/method-related
   - matplotlib
-  - numpy
+  - numpy<2
   - pillow
   - scipy
   - scikit-image
