@@ -66,3 +66,47 @@ class TestShorelineOtsuEndpoints:
 
         assert SHORELINE_PLOT_URI in response_data
         assert str( response_data[SHORELINE_PLOT_URI] ).startswith( 'http' )
+
+    def test_invalid_upload(self):
+
+        method_framework = MethodFramework.skimage.value
+        method_name = MethodName.shoreline_otsu.value
+        method_version = ShorelineOtsuVersion.v1.value
+        oakisland_west = Shoreline.oakisland_west.value
+
+        endpoint_path = f"/{method_framework}/{method_name}/{method_version}/{oakisland_west}/upload"
+
+        assert endpoint_path == '/skimage/shoreline_otsu/v1/oakisland_west/upload'
+
+        assert oakisland_west_test_input_file_path.exists()
+        assert oakisland_west_test_input_file_path.is_file()
+
+        with open( str( oakisland_west_test_input_file_path ), 'rb' ) as fh:
+            response = test_http_client.post(
+                endpoint_path,
+                headers = {
+                    # 'Content-Type': 'multipart/form-data',
+                    'Accept': 'application/json'
+                },
+                params={
+                    # Request a very high minimum number of points to guarantee
+                    # an invalid result.
+                    'minimum_shoreline_points': 100
+                },
+                files = {
+                    'file': fh
+                }
+            )
+
+        assert response.status_code == 200, \
+            (
+                "Must succeed with HTTP 200 response, got "
+                f"{response.status_code}, response: {response.text}"
+            )
+
+        response_data = response.json()
+
+        IS_VALID='is_valid'
+
+        assert IS_VALID in response_data
+        assert response_data[IS_VALID] == False
