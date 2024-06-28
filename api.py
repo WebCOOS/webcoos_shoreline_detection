@@ -1,12 +1,16 @@
 import os
 # import requests
-from typing import Any
+from typing import Any, Annotated
 from pathlib import Path
 from pydantic import BaseModel
-from fastapi import FastAPI, Depends, UploadFile, Request
+from fastapi import FastAPI, Depends, UploadFile, Request, Query
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from shoreline_otsu_processing import shoreline_otsu_process_image, SKIMAGE_METHODS
+from shoreline_otsu_processing import (
+    shoreline_otsu_process_image,
+    SKIMAGE_METHODS,
+    DEFAULT_MINIMUM_SHORELINE_DETECTION_POINTS
+)
 from metrics import make_metrics_app
 from namify import namify_for_content
 from result import ShorelineDetectionResult
@@ -89,7 +93,14 @@ def shoreline_otsu_from_upload(
     shoreline_name: Shoreline,
     file: UploadFile,
     shoreline_method: Any = Depends(get_shoreline_method),
-):
+    minimum_shoreline_points: int|None = Annotated[
+        int|None,
+        Query(
+            alias="minimum_shoreline_points",
+            gt=0
+        )
+    ]
+) -> ShorelineDetectionResult:
     """Perform shoreline detection based on selected method and method version."""
     bytedata = file.file.read()
 
@@ -98,35 +109,49 @@ def shoreline_otsu_from_upload(
     assert ext in ALLOWED_IMAGE_EXTENSIONS, \
         f"{ext} not in allowed image file types: {repr(ALLOWED_IMAGE_EXTENSIONS)}"
 
-    detection_result = shoreline_otsu_process_image(
+    if (
+        minimum_shoreline_points is None or
+        not isinstance( minimum_shoreline_points, int )
+    ):
+        minimum_shoreline_points = DEFAULT_MINIMUM_SHORELINE_DETECTION_POINTS
+
+    assert minimum_shoreline_points > 0, "minimum_shoreline_points must be > 0"
+
+    detection_result: ShorelineDetectionResult = shoreline_otsu_process_image(
         shoreline_method,
         output_path,
         method,
         version,
         shoreline_name,
         name,
-        bytedata
+        bytedata,
+        minimum_shoreline_points
     )
 
-    rel_path = os.path.relpath(
-        detection_result.shoreline_plot_uri,
-        output_path
-    )
-
-    url_path_for_output = rel_path
-
-    try:
-        # Try for an absolute URL (prefixed with http(s)://hostname, etc.)
-        url_path_for_output = str( request.url_for( 'outputs', path=rel_path ) )
-    except Exception:
-        # Fall back to the relative URL determined by the router
-        url_path_for_output = app.url_path_for(
-            'outputs', path=rel_path
+    if detection_result.shoreline_plot_uri is not None:
+        # Attempt to give the shoreline path as helpful of a URI/URL as
+        # possible, relying on the FastAPI routing to be able to provide a URL
+        # to the file in the event that it is mounted under the 'outputs'
+        # directory
+        rel_path = os.path.relpath(
+            detection_result.shoreline_plot_uri,
+            output_path
         )
-    finally:
-        pass
 
-    detection_result.shoreline_plot_uri = url_path_for_output
+        url_path_for_output = rel_path
+
+        try:
+            # Try for an absolute URL (prefixed with http(s)://hostname, etc.)
+            url_path_for_output = str( request.url_for( 'outputs', path=rel_path ) )
+        except Exception:
+            # Fall back to the relative URL determined by the router
+            url_path_for_output = app.url_path_for(
+                'outputs', path=rel_path
+            )
+        finally:
+            pass
+
+        detection_result.shoreline_plot_uri = url_path_for_output
 
     return detection_result
 

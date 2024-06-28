@@ -20,3 +20,5 @@ class ShorelineDetectionResult():
     detected_shoreline: dict = None
 
     shoreline_plot_uri: str = None
+
+    is_valid: bool = None
