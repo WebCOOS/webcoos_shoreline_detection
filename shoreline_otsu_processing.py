@@ -440,6 +440,12 @@ SKIMAGE_METHODS = {
     }
 }
 
+# Criteria for successful shoreline detections based on input imagery:
+#
+# 1) At least a certain number of detected shorline points
+DEFAULT_MINIMUM_SHORELINE_DETECTION_POINTS = 5
+# 2) TODO: error detection (stddev, etc.)
+
 
 def shoreline_otsu_process_image(
     shoreline_method: AbstractShorelineImplementation,
@@ -448,7 +454,8 @@ def shoreline_otsu_process_image(
     version: Union[ShorelineOtsuVersion, str],
     shoreline_name: Union[Shoreline, str],
     name: str,
-    bytedata: bytes
+    bytedata: bytes,
+    minimum_shoreline_points: int = DEFAULT_MINIMUM_SHORELINE_DETECTION_POINTS
 ) -> ShorelineDetectionResult:
 
     assert shoreline_method is not None, \
@@ -468,6 +475,10 @@ def shoreline_otsu_process_image(
 
     assert isinstance( model, ( MethodName, str ) )
     assert isinstance( version, ( ShorelineOtsuVersion, str ) )
+
+    assert minimum_shoreline_points is not None
+    assert isinstance( minimum_shoreline_points, int )
+    assert minimum_shoreline_points > 0
 
     if( isinstance( model, MethodName ) ):
         model = model.value
@@ -511,16 +522,34 @@ def shoreline_otsu_process_image(
         frame
     )
 
-    assert isinstance( fig_tranSL, Figure )
+    # Valid by default...
+    ret.is_valid = True
 
-    fig_tranSL.savefig(
-        output_file_jpg,
-        bbox_inches = 'tight',
-        dpi = 400
-    )
+    # Unless the validation criteria mark the result as invalid
+    if len( slVars['Shoreline Points'] ) < minimum_shoreline_points:
+
+        logger.warning(
+            f"[{shoreline_name}] Less than {minimum_shoreline_points} shoreline"
+            f" points ({len( slVars['Shoreline Points'] )}), marking shoreline"
+            " detection as invalid."
+        )
+        ret.is_valid = False
+
+    if ret.is_valid is True:
+        # If still valid, take the time to write out the output image, otherwise
+        # don't bother to generate a figure.
+
+        assert isinstance( fig_tranSL, Figure )
+
+        fig_tranSL.savefig(
+            output_file_jpg,
+            bbox_inches = 'tight',
+            dpi = 400
+        )
+
+        ret.shoreline_plot_uri = str( output_file_jpg )
 
     ret.detected_shoreline = slVars
-    ret.shoreline_plot_uri = str( output_file_jpg )
 
     increment_shoreline_counter(
         MethodFramework.skimage.value,
