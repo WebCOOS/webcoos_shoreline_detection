@@ -140,21 +140,21 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         yList = [0]*length
         xList = [0]*length
 
+        def find_first_exceeding_index(values, threshold):
+            values = np.array(values)
+
+            # Iterate through values to find the first crossing
+            for i in range(1, len(values)):
+                if (values[i-1] < threshold and values[i] >= threshold) or (values[i-1] >= threshold and values[i] < threshold):
+                    return i
+            return None
+
         # Checks orientation.
         if orn == 0:
-            def find_first_exceeding_index(values, threshold):
-                values = np.array(values)
-
-                # Iterate through values to find the first crossing
-                for i in range(1, len(values)):
-                    if (values[i-1] < threshold and values[i] >= threshold) or (values[i-1] >= threshold and values[i] < threshold):
-                        return i
-                return None
-
             for i in trsct:
                 x = int(xt[i][0])
-                yMax = round(yt[i][1])
-                yMin = round(yt[i][0])
+                yMax = int(yt[i][1])
+                yMin = int(yt[i][0])
                 y = yMax-yMin
                 yList[i] = np.zeros(shape=y)
                 val = [0]*(yMax-yMin)
@@ -181,17 +181,9 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 shoreline = np.vstack((xPt,yPt)).T
 
         else:
-            def find_first_exceeding_index(values, threshold):
-                values = np.array(values)
-
-                # Iterate through values to find the first crossing
-                for i in range(1, len(values)):
-                    if (values[i-1] < threshold and values[i] >= threshold) or (values[i-1] >= threshold and values[i] < threshold):
-                        return i
-                return None
 
             for i in trsct:
-                xMax = round(xt[i][0])
+                xMax = int(xt[i][0])
                 y = int(yt[i][0])
                 yList[i] = np.full(shape=xMax, fill_value= y)
                 xList[i] = np.arange(xMax)
