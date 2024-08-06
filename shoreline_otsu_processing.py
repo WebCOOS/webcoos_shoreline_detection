@@ -107,7 +107,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         xt = np.asarray(transects['x'])
         yt = np.asarray(transects['y'])
         n = len(xt)
-        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i,0], xt[i,0]), mode='constant') for i in range(int(2*n/3-1), int(2*n/3+1))]
+        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(int(2*n/3-1), int(2*n/3+1))]
         improfile = np.concatenate(imProf)[~np.isnan(np.concatenate(imProf))]
         return improfile
 
@@ -158,7 +158,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 y = yMax-yMin
                 yList[i] = np.zeros(shape=y)
                 val = [0]*(yMax-yMin)
-                for j in range(0,len(val)):
+                for j in range(0, len(val)):
                     k = yMin + j
                     val[j] = rmb[k][x]
                 val = np.array(val)
@@ -172,13 +172,13 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
             # Checks revValues againts thresh_otsu.
             for i in range(0, len(values)):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
-                if idx[i] == None:
+                if idx[i] is None:
                     yPt[i] = None
                     xPt[i] = None
                 else:
                     yPt[i] = min(yt[i]) + idx[i]
                     xPt[i] = int(xt[i][0])
-                shoreline = np.vstack((xPt,yPt)).T
+                shoreline = np.vstack((xPt, yPt)).T
 
         else:
 
@@ -187,7 +187,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 y = int(yt[i][0])
                 yList[i] = np.full(shape=xMax, fill_value= y)
                 xList[i] = np.arange(xMax)
-                values[i] =rmb[y][0:xMax]
+                values[i] = rmb[y][0:xMax]
                 revValues[i] = rmb[y][::-1]
 
             # intersect = [0]*len(yt)
@@ -199,7 +199,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
                 xPt[i] = idx[i]
                 yPt[i] = int(yt[i][0])
-                shoreline = np.vstack((xPt,yPt)).T
+                shoreline = np.vstack((xPt, yPt)).T
 
         slVars = {
             'Station Name': stationname,
