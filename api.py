@@ -93,8 +93,8 @@ def shoreline_otsu_from_upload(
     shoreline_name: Shoreline,
     file: UploadFile,
     shoreline_method: Any = Depends(get_shoreline_method),
-    minimum_shoreline_points: int|None = Annotated[
-        int|None,
+    minimum_shoreline_points: int | None = Annotated[
+        int | None,
         Query(
             alias="minimum_shoreline_points",
             gt=0

@@ -6,3 +6,4 @@ class Shoreline(str, Enum):
     """JSON configuration files."""
 
     oakisland_west = "oakisland_west"
+    currituck_hampton_inn = "currituck_hampton_inn"

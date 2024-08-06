@@ -107,7 +107,7 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         xt = np.asarray(transects['x'])
         yt = np.asarray(transects['y'])
         n = len(xt)
-        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(n)]
+        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(int(2*n/3-1), int(2*n/3+1))]
         improfile = np.concatenate(imProf)[~np.isnan(np.concatenate(imProf))]
         return improfile
 
@@ -139,18 +139,22 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         revValues = [0]*length
         yList = [0]*length
         xList = [0]*length
+
+        def find_first_exceeding_index(values, threshold):
+            values = np.array(values)
+
+            # Iterate through values to find the first crossing
+            for i in range(1, len(values)):
+                if (values[i-1] < threshold and values[i] >= threshold) or (values[i-1] >= threshold and values[i] < threshold):
+                    return i
+            return None
+
         # Checks orientation.
         if orn == 0:
-            # Finds the index of the first occurrence of value greater than thresh_otsu.
-            def find_intersect(List, thresh):
-                res = [k for k, x in enumerate(List) if x > thresh_otsu]
-                return 0 if res == [] else res[0]
-            # Loops over each transect and extracts values from rmb array via cooridnate location.
-            # Differences yMax and yMin to determine number of elements in the val list. Then populates.
             for i in trsct:
                 x = int(xt[i][0])
-                yMax = round(yt[i][1])
-                yMin = round(yt[i][0])
+                yMax = int(yt[i][1])
+                yMin = int(yt[i][0])
                 y = yMax-yMin
                 yList[i] = np.zeros(shape=y)
                 val = [0]*(yMax-yMin)
@@ -159,125 +163,43 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                     val[j] = rmb[k][x]
                 val = np.array(val)
                 values[i] = val
+
             # Finding the index of the intersection point with the threshold value.
             # Calculates the x and y coordinates of the intersection point and stores.
-            intersect = [0]*len(xt)
             idx = [0]*len(xt)
-            Pts = [0]*len(xt)
             xPt = [0]*len(xt)
             yPt = [0]*len(xt)
-            # Checks values againts thresh_otsu.
+            # Checks revValues againts thresh_otsu.
             for i in range(0, len(values)):
-                intersect[i] = find_intersect(values[i], thresh_otsu)
-                idx[i] = np.where(values[i][intersect[i]] == values[i])
-                n = len(idx[i][0])-1
-                if len(idx[i][0]) == 0:
+                idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
+                if idx[i] is None:
                     yPt[i] = None
                     xPt[i] = None
                 else:
-                    yPt[i] = min(yt[i]) + idx[i][0][n]
+                    yPt[i] = min(yt[i]) + idx[i]
                     xPt[i] = int(xt[i][0])
-                    Pts[i] = (xPt[i], yPt[i])
-                # Calculates the average value in a 21x21 sample around point.
-                areaAvg = [0]*len(Pts)
-                sample = np.zeros((21, 21))
-
-                for i in range(0, len(Pts)):
-                    if Pts[i] == 0:
-                        pass
-                    else:
-                        orginX = int(Pts[i][0])
-                        orginY = int(Pts[i][1])
-                        xBounds = range(orginX - 10, orginX + 11)
-                        yBounds = range(orginY - 10, orginY + 11)
-                        for j in yBounds:
-                            a = j - orginY
-                            for k in xBounds:
-                                b = k - orginX
-                                sample[a][b] = rmb[j][k]
-                        areaAvg[i] = np.mean(sample)
-                # Removes points that fall outside a sample range.
-                buffer = (float(thresh_otsu) * .20)
-                exc = {0}
-                for i in range(0, len(Pts)):
-                    if abs((buffer + thresh_otsu)) > abs(areaAvg[i]) > abs((buffer - thresh_otsu)):
-                        pass
-                    else:
-                        exc.add(i)
-                truePts = [v for i, v in enumerate(Pts) if i not in exc]
-                threshX = [0]*len(truePts)
-                threshY = [0]*len(truePts)
-                for i in range(0, len(truePts)):
-                    threshX[i] = truePts[i][0]
-                    threshY[i] = truePts[i][1]
-                # Stores the shoreline points array.
-                threshX = np.array(threshX)
-                threshY = np.array(threshY)
-                shoreline = np.vstack((threshX, threshY)).T
+                shoreline = np.vstack((xPt, yPt)).T
 
         else:
-            def find_intersect(List, thresh):
-                res = [k for k, x in enumerate(List) if x < thresh_otsu]
-                return 0 if res == [] else res[0]
 
             for i in trsct:
-                xMax = round(xt[i][0])
+                xMax = int(xt[i][0])
                 y = int(yt[i][0])
                 yList[i] = np.full(shape=xMax, fill_value= y)
                 xList[i] = np.arange(xMax)
                 values[i] = rmb[y][0:xMax]
                 revValues[i] = rmb[y][::-1]
 
-            intersect = [0]*len(yt)
+            # intersect = [0]*len(yt)
             idx = [0]*len(yt)
-            Pts = [0]*len(yt)
             xPt = [0]*len(yt)
             yPt = [0]*len(yt)
             # Checks revValues againts thresh_otsu.
-            for i in range(0, len(values)):
-                intersect[i] = find_intersect(revValues[i], thresh_otsu)
-                idx[i] = np.where(revValues[i][intersect[i]] == values[i])
-                n = len(idx[i][0])-1
-                if len(idx[i][0]) == 0:
-                    xPt[i] = None
-                    yPt[i] = None
-                else:
-                    xPt[i] = idx[i][0][n]
-                    yPt[i] = int(yt[i][0])
-                    Pts[i] = (xPt[i], yPt[i])
-                areaAvg = [0]*len(Pts)
-                sample = np.zeros((21, 21))
-
-                for i in range(0, len(Pts)):
-                    if Pts[i] == 0:
-                        pass
-                    else:
-                        orginX = Pts[i][0]
-                        orginY = Pts[i][1]
-                        xBounds = range(orginX - 10, orginX + 11)
-                        yBounds = range(orginY - 10, orginY + 11)
-                        for j in yBounds:
-                            a = j - orginY
-                            for k in xBounds:
-                                b = k - orginX
-                                sample[a][b] = rmb[j][k]
-                        areaAvg[i] = np.mean(sample)
-                buffer = (float(thresh_otsu) * .20)
-                exc = {0}
-                for i in range(0, len(Pts)):
-                    if abs((buffer + thresh_otsu)) > abs(areaAvg[i]) > abs((buffer - thresh_otsu)):
-                        pass
-                    else:
-                        exc.add(i)
-                truePts = [v for i, v in enumerate(Pts) if i not in exc]
-                threshX = [0]*len(truePts)
-                threshY = [0]*len(truePts)
-                for i in range(0, len(truePts)):
-                    threshX[i] = truePts[i][0]
-                    threshY[i] = truePts[i][1]
-                threshX = np.array(threshX)
-                threshY = np.array(threshY)
-                shoreline = np.vstack((threshX, threshY)).T
+            for i in range(0, len(revValues)):
+                idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
+                xPt[i] = idx[i]
+                yPt[i] = int(yt[i][0])
+                shoreline = np.vstack((xPt, yPt)).T
 
         slVars = {
             'Station Name': stationname,
