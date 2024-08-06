@@ -51,7 +51,8 @@ for ( fw, mdl, ver, sl_name ) in SHORELINES:
     )
 
 
-PROMETHEUS_MULTIPROC_DIR='PROMETHEUS_MULTIPROC_DIR'
+PROMETHEUS_MULTIPROC_DIR = 'PROMETHEUS_MULTIPROC_DIR'
+
 
 def make_metrics_app():
     registry = CollectorRegistry()
