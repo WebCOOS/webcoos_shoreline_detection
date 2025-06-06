@@ -242,15 +242,31 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
     @classmethod
     def pltFig_tranSL( cls, stationInfo, photo, tranSL):
-        # Creates shoreline product.
         stationname = stationInfo['Station Name']
         # dtInfo = stationInfo['Datetime Info']
         # date = str(dtInfo.date())
-        # time = str(dtInfo.hour) + str(dtInfo.minute)
+        # time = str(dtInfo.hour).zfill(2) + str(dtInfo.minute).zfill(2)  # Ensure two digits for hour and minute
         Di = stationInfo['Dune Line Info']
-        duneInt = Di['Dune Line Interpolation']
-        xi, py = duneInt[:, 0], duneInt[:, 1]
-        plt.ioff()
+        # duneInt = Di['Dune Line Interpolation']
+        duneInt = Di['Dune Line Points']
+        xi, py = duneInt[:,0], duneInt[:,1]
+        tranSL = np.array(tranSL, dtype=np.float64)
+
+        # Filter rows with NaN values
+        valid_mask = ~np.isnan(tranSL).any(axis=1)
+        tranSL = tranSL[valid_mask]
+
+        # Sort based on orientation
+        if len(tranSL) > 0:  # Only sort if we have valid points
+            if stationInfo['Orientation'] in [0, 3]:
+                tranSL = tranSL[np.argsort(tranSL[:, 0])]
+            elif stationInfo['Orientation'] in [1, 2]:
+                tranSL = tranSL[np.argsort(tranSL[:, 1])]
+        else:
+            # print("Warning: No valid shoreline points after filtering")
+            # print(f"Sorted tranSL coordinates: {tranSL}")
+            plt.ioff()
+
         fig_tranSL = plt.figure()
         plt.imshow(photo, interpolation='nearest')
         plt.xlabel("Image Width (pixels)", fontsize=10)
@@ -262,7 +278,8 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         plt.title(
             (
                 'Transect Based Shoreline Detection (Time Averaged)\n'
-                + stationname
+                + stationname.capitalize()
+                # + ' on ' + date + ' at ' + time[:2] + ':' + time[2:] + ' UTC'
             ),
             fontsize = 12
         )
