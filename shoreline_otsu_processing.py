@@ -19,11 +19,13 @@ import json
 # import math
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.path import Path as MatplotlibPath
 import numpy as np
 import os
 from PIL import Image, ImageDraw
 # import re
 import scipy.signal as signal
+from scipy.ndimage import binary_dilation
 from skimage.filters import threshold_otsu
 from skimage.measure import profile_line
 from statsmodels.nonparametric.kde import KDEUnivariate
@@ -88,21 +90,48 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
     @classmethod
     def mapROI( cls, stationInfo, photo):
-        # Draws a mask on the region of interest and turns the other pixel values to nan.
-        w, h = photo.shape[1], photo.shape[0]
-        transects = stationInfo['Shoreline Transects']
-        xt = np.asarray(transects['x'], dtype=int)
-        yt = np.asarray(transects['y'], dtype=int)
-        cords = np.column_stack((xt[:, 1], yt[:, 1]))
-        cords = np.vstack((cords, np.column_stack((xt[::-1, 0], yt[::-1, 0]))))
-        cords = np.vstack((cords, cords[0]))
-        poly = list(chain.from_iterable(cords))
-        img = Image.new('L', (w, h), 0)
-        ImageDraw.Draw(img).polygon(poly, outline=1, fill=1)
-        mask = np.array(img)
+        """
+        Creates a mask from pre-defined ROI points and extracts ROI from the image.
+        Uses the roi_points directly for more reliable polygon construction.
+        """
+        # Input validation
+        if not isinstance(photo, np.ndarray) or photo.ndim not in [2, 3]:
+                raise ValueError("photo must be a 2D or 3D numpy array")
+
+        h, w = photo.shape[:2]
+        is_color = photo.ndim == 3
+
+        # Get ROI points
+        roi_points = np.array(stationInfo['roi_points'], dtype=float)
+
+        # Ensure ROI points are within image bounds
+        roi_points[:, 0] = np.clip(roi_points[:, 0], 0, w-1)
+        roi_points[:, 1] = np.clip(roi_points[:, 1], 0, h-1)
+
+            # Close the polygon if not already closed
+        if not np.array_equal(roi_points[0], roi_points[-1]):
+            roi_points = np.vstack((roi_points, roi_points[0]))
+
+        # Create mask
+        x, y = np.meshgrid(np.arange(w), np.arange(h))
+        points = np.column_stack((x.ravel(), y.ravel()))
+        path = MatplotlibPath(roi_points)
+        mask = path.contains_points(points).reshape(h, w)
+
+        # Apply slight dilation to include edge pixels
+        mask = binary_dilation(mask, structure=np.ones((3, 3)))
+
+        # Apply mask
         maskedImg = photo.astype(np.float64)
-        maskedImg[mask == 0] = np.nan
-        maskedImg /= 255
+        if is_color:
+            mask_3d = np.repeat(mask[:, :, np.newaxis], photo.shape[2], axis=2)
+            maskedImg[~mask_3d] = np.nan
+        else:
+            maskedImg[~mask] = np.nan
+
+        if maskedImg.max() > 1:
+            maskedImg /= 255.0
+
         return maskedImg
 
     @classmethod
