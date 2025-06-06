@@ -187,24 +187,26 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         if orn == 0:
             for i in trsct:
                 x = int(xt[i][0])
-                yMax = int(yt[i][1])
-                yMin = int(yt[i][0])
-                y = yMax-yMin
+                if 'roi_points' not in stationInfo:
+                    yMax = int(yt[i][0]) # JWL flipped these for new cocoabeach station config
+                    yMin = int(yt[i][1]) # JWL flipped these for new cocoabeach station config
+                else:
+                    yMax = int(yt[i][1])
+                    yMin = int(yt[i][0])
+                y = yMax - yMin
+                # y = abs(y)
                 yList[i] = np.zeros(shape=y)
-                val = [0]*(yMax-yMin)
-                for j in range(0, len(val)):
+                val = [0]*(yMax - yMin)
+                for j in range(len(val)):
                     k = yMin + j
                     val[j] = rmb[k][x]
                 val = np.array(val)
                 values[i] = val
 
-            # Finding the index of the intersection point with the threshold value.
-            # Calculates the x and y coordinates of the intersection point and stores.
             idx = [0]*len(xt)
             xPt = [0]*len(xt)
             yPt = [0]*len(xt)
-            # Checks revValues againts thresh_otsu.
-            for i in range(0, len(values)):
+            for i in range(len(values)):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
                 if idx[i] is None:
                     yPt[i] = None
@@ -212,38 +214,72 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 else:
                     yPt[i] = min(yt[i]) + idx[i]
                     xPt[i] = int(xt[i][0])
-                shoreline = np.vstack((xPt, yPt)).T
-
-        else:
-
+            shoreline = np.vstack((xPt, yPt)).T
+        # if orn == 3, then we need to find the first exceeding index in the opposite direction of orn == 0
+        elif orn == 3:
             for i in trsct:
-                xMax = int(xt[i][0])
+                x = int(xt[i][0])
+                if 'roi_points' not in stationInfo:
+                    yMax = int(yt[i][0]) # JWL flipped these for new cocoabeach station config
+                    yMin = int(yt[i][1]) # JWL flipped these for new cocoabeach station config
+                else:
+                    yMax = int(yt[i][1]) # flipped for the Ferry Beach station config
+                    yMin = int(yt[i][0]) # flipped for the Ferry Beach station config
+                y = yMax - yMin
+                y = abs(y)
+                print(f"shape of y: {y}")
+                yList[i] = np.zeros(shape=y)
+                val = [0]*y
+                for j in range(len(val)):
+                    k = yMin + j
+                    val[j] = rmb[k][x]
+                val = np.array(val)
+                values[i] = val
+            # reverse the values for orn == 3
+            revValues = [val[::-1] for val in values]
+            idx = [0]*len(xt)
+            xPt = [0]*len(xt)
+            yPt = [0]*len(xt)
+            for i in range(len(revValues)):
+                idx[i] = find_first_exceeding_index(revValues[i], thresh_otsu)
+                if idx[i] is None:
+                    yPt[i] = None
+                    xPt[i] = None
+                else:
+                    yPt[i] = max(yt[i]) - idx[i]
+                    xPt[i] = int(xt[i][0])
+            shoreline = np.vstack((xPt, yPt)).T
+        # for orn == 1 or 2
+        else:
+            for i in trsct:
+                xMax = int(xt[i][1])  # JWL chnged this from 0 Jeanettes ok, still ok for Oak Island
                 y = int(yt[i][0])
-                yList[i] = np.full(shape=xMax, fill_value= y)
+                yList[i] = np.full(shape=xMax, fill_value=y)
                 xList[i] = np.arange(xMax)
                 values[i] = rmb[y][0:xMax]
                 revValues[i] = rmb[y][::-1]
 
-            # intersect = [0]*len(yt)
             idx = [0]*len(yt)
             xPt = [0]*len(yt)
             yPt = [0]*len(yt)
-            # Checks revValues againts thresh_otsu.
-            for i in range(0, len(revValues)):
+            for i in range(len(revValues)):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
                 xPt[i] = idx[i]
                 yPt[i] = int(yt[i][0])
-                shoreline = np.vstack((xPt, yPt)).T
+            shoreline = np.vstack((xPt, yPt)).T
 
         slVars = {
             'Station Name': stationname,
             'Date': str(date),
             'Time Info': str(dtInfo),
-            'Thresh': thresh,
-            'Otsu Threshold': thresh_otsu,
-            'Shoreline Transects': slTransects,
-            'Threshold Weightings': thresh_weightings,
-            'Shoreline Points': shoreline
+            'Thresh': float(thresh),
+            'Otsu Threshold': float(thresh_otsu),
+            'Shoreline Transects': {
+                'x': xt.tolist(),
+                'y': yt.tolist()
+            },
+            'Threshold Weightings': [float(w) for w in thresh_weightings],
+            'Shoreline Points': [[float(item) if item is not None else None for item in point] for point in shoreline]
         }
 
         try:
@@ -252,13 +288,9 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         except Exception:
             pass
 
-        if isinstance( slVars['Shoreline Transects']['x'], np.ndarray ):
+        if isinstance(slVars['Shoreline Transects']['x'], np.ndarray):
             slVars['Shoreline Transects']['x'] = slVars['Shoreline Transects']['x'].tolist()
             slVars['Shoreline Transects']['y'] = slVars['Shoreline Transects']['y'].tolist()
-        else:
-            pass
-
-        slVars['Shoreline Points'] = slVars['Shoreline Points'].tolist()
 
         # JAR: Don't emit the JSON file here, instead return the slVars to the
         # calling function along with the shoreline points.
