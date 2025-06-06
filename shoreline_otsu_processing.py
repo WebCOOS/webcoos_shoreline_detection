@@ -109,10 +109,10 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
     def improfile( cls, rmb, stationInfo):
         # Extract intensity profiles along shoreline transects.
         transects = stationInfo['Shoreline Transects']
-        xt = np.asarray(transects['x'])
-        yt = np.asarray(transects['y'])
+        xt = np.asarray(transects['x'], dtype=int)
+        yt = np.asarray(transects['y'], dtype=int)
         n = len(xt)
-        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(int(2*n/3-1), int(2*n/3+1))]
+        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(n)]
         improfile = np.concatenate(imProf)[~np.isnan(np.concatenate(imProf))]
         return improfile
 
