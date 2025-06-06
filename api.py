@@ -93,13 +93,13 @@ def shoreline_otsu_from_upload(
     shoreline_name: Shoreline,
     file: UploadFile,
     shoreline_method: Any = Depends(get_shoreline_method),
-    minimum_shoreline_points: int | None = Annotated[
+    minimum_shoreline_points: Annotated[
         int | None,
         Query(
             alias="minimum_shoreline_points",
             gt=0
         )
-    ]
+    ] = DEFAULT_MINIMUM_SHORELINE_DETECTION_POINTS
 ) -> ShorelineDetectionResult:
     """Perform shoreline detection based on selected method and method version."""
     bytedata = file.file.read()
