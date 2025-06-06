@@ -76,7 +76,12 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         assert 'Dune Line Info' in stationInfo
         assert 'Shoreline Transects' in stationInfo
 
-        stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
+        #if missing dune line interpolation, check dune line points
+        if 'Dune Line Interpolation' in stationInfo['Dune Line Info']:
+            stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
+        else:
+            stationInfo['Dune Line Info']['Dune Line Points'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Points'])
+
         stationInfo['Shoreline Transects']['x'] = np.asarray(stationInfo['Shoreline Transects']['x'])
         stationInfo['Shoreline Transects']['y'] = np.asarray(stationInfo['Shoreline Transects']['y'])
         return stationInfo
