@@ -6,7 +6,7 @@ dependencies:
   # Python
   - python>=3.11,<3.12
   # API-related
-  - fastapi
+  - fastapi<0.116.0
   - gunicorn
   - python-multipart
   - uvicorn
