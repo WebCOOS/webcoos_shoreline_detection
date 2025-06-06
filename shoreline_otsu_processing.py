@@ -320,7 +320,18 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
         photoAvg = frame
 
+        # By default, resize to 30% original size
         new_size = (int(photoAvg.shape[1] * 0.3), int(photoAvg.shape[0] * 0.3))
+        # Unless otherwise defined in station config
+        if 'Image Resize' in stationInfo:
+            resize_factor = stationInfo['Image Resize']
+            # convert to float from string
+            resize_factor = float(resize_factor) / 100
+            # Check if resize_factor is a valid number between 0 and 1
+            if isinstance(resize_factor, (int, float)) and 0 < resize_factor <= 1:
+                # Resize the image
+                new_size = (int(photoAvg.shape[1] * resize_factor), int(photoAvg.shape[0] * resize_factor))
+
         resized_image = cv2.resize(photoAvg, new_size, interpolation=cv2.INTER_AREA)
 
         # Creating an array version of image dimensions for plotting.
