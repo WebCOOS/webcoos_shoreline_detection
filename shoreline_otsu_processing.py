@@ -19,11 +19,13 @@ import json
 # import math
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.path import Path as MatplotlibPath
 import numpy as np
 import os
 from PIL import Image, ImageDraw
 # import re
 import scipy.signal as signal
+from scipy.ndimage import binary_dilation
 from skimage.filters import threshold_otsu
 from skimage.measure import profile_line
 from statsmodels.nonparametric.kde import KDEUnivariate
@@ -76,38 +78,70 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         assert 'Dune Line Info' in stationInfo
         assert 'Shoreline Transects' in stationInfo
 
-        stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
+        #if missing dune line interpolation, check dune line points
+        if 'Dune Line Interpolation' in stationInfo['Dune Line Info']:
+            stationInfo['Dune Line Info']['Dune Line Interpolation'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Interpolation'])
+        else:
+            stationInfo['Dune Line Info']['Dune Line Points'] = np.asarray(stationInfo['Dune Line Info']['Dune Line Points'])
+
         stationInfo['Shoreline Transects']['x'] = np.asarray(stationInfo['Shoreline Transects']['x'])
         stationInfo['Shoreline Transects']['y'] = np.asarray(stationInfo['Shoreline Transects']['y'])
         return stationInfo
 
     @classmethod
     def mapROI( cls, stationInfo, photo):
-        # Draws a mask on the region of interest and turns the other pixel values to nan.
-        w, h = photo.shape[1], photo.shape[0]
-        transects = stationInfo['Shoreline Transects']
-        xt = np.asarray(transects['x'], dtype=int)
-        yt = np.asarray(transects['y'], dtype=int)
-        cords = np.column_stack((xt[:, 1], yt[:, 1]))
-        cords = np.vstack((cords, np.column_stack((xt[::-1, 0], yt[::-1, 0]))))
-        cords = np.vstack((cords, cords[0]))
-        poly = list(chain.from_iterable(cords))
-        img = Image.new('L', (w, h), 0)
-        ImageDraw.Draw(img).polygon(poly, outline=1, fill=1)
-        mask = np.array(img)
+        """
+        Creates a mask from pre-defined ROI points and extracts ROI from the image.
+        Uses the roi_points directly for more reliable polygon construction.
+        """
+        # Input validation
+        if not isinstance(photo, np.ndarray) or photo.ndim not in [2, 3]:
+                raise ValueError("photo must be a 2D or 3D numpy array")
+
+        h, w = photo.shape[:2]
+        is_color = photo.ndim == 3
+
+        # Get ROI points
+        roi_points = np.array(stationInfo['roi_points'], dtype=float)
+
+        # Ensure ROI points are within image bounds
+        roi_points[:, 0] = np.clip(roi_points[:, 0], 0, w-1)
+        roi_points[:, 1] = np.clip(roi_points[:, 1], 0, h-1)
+
+            # Close the polygon if not already closed
+        if not np.array_equal(roi_points[0], roi_points[-1]):
+            roi_points = np.vstack((roi_points, roi_points[0]))
+
+        # Create mask
+        x, y = np.meshgrid(np.arange(w), np.arange(h))
+        points = np.column_stack((x.ravel(), y.ravel()))
+        path = MatplotlibPath(roi_points)
+        mask = path.contains_points(points).reshape(h, w)
+
+        # Apply slight dilation to include edge pixels
+        mask = binary_dilation(mask, structure=np.ones((3, 3)))
+
+        # Apply mask
         maskedImg = photo.astype(np.float64)
-        maskedImg[mask == 0] = np.nan
-        maskedImg /= 255
+        if is_color:
+            mask_3d = np.repeat(mask[:, :, np.newaxis], photo.shape[2], axis=2)
+            maskedImg[~mask_3d] = np.nan
+        else:
+            maskedImg[~mask] = np.nan
+
+        if maskedImg.max() > 1:
+            maskedImg /= 255.0
+
         return maskedImg
 
     @classmethod
     def improfile( cls, rmb, stationInfo):
         # Extract intensity profiles along shoreline transects.
         transects = stationInfo['Shoreline Transects']
-        xt = np.asarray(transects['x'])
-        yt = np.asarray(transects['y'])
+        xt = np.asarray(transects['x'], dtype=int)
+        yt = np.asarray(transects['y'], dtype=int)
         n = len(xt)
-        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(int(2*n/3-1), int(2*n/3+1))]
+        imProf = [profile_line(rmb, (yt[i, 1], xt[i, 1]), (yt[i, 0], xt[i, 0]), mode='constant') for i in range(n)]
         improfile = np.concatenate(imProf)[~np.isnan(np.concatenate(imProf))]
         return improfile
 
@@ -153,24 +187,26 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         if orn == 0:
             for i in trsct:
                 x = int(xt[i][0])
-                yMax = int(yt[i][1])
-                yMin = int(yt[i][0])
-                y = yMax-yMin
+                if 'roi_points' not in stationInfo:
+                    yMax = int(yt[i][0]) # JWL flipped these for new cocoabeach station config
+                    yMin = int(yt[i][1]) # JWL flipped these for new cocoabeach station config
+                else:
+                    yMax = int(yt[i][1])
+                    yMin = int(yt[i][0])
+                y = yMax - yMin
+                # y = abs(y)
                 yList[i] = np.zeros(shape=y)
-                val = [0]*(yMax-yMin)
-                for j in range(0, len(val)):
+                val = [0]*(yMax - yMin)
+                for j in range(len(val)):
                     k = yMin + j
                     val[j] = rmb[k][x]
                 val = np.array(val)
                 values[i] = val
 
-            # Finding the index of the intersection point with the threshold value.
-            # Calculates the x and y coordinates of the intersection point and stores.
             idx = [0]*len(xt)
             xPt = [0]*len(xt)
             yPt = [0]*len(xt)
-            # Checks revValues againts thresh_otsu.
-            for i in range(0, len(values)):
+            for i in range(len(values)):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
                 if idx[i] is None:
                     yPt[i] = None
@@ -178,38 +214,72 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
                 else:
                     yPt[i] = min(yt[i]) + idx[i]
                     xPt[i] = int(xt[i][0])
-                shoreline = np.vstack((xPt, yPt)).T
-
-        else:
-
+            shoreline = np.vstack((xPt, yPt)).T
+        # if orn == 3, then we need to find the first exceeding index in the opposite direction of orn == 0
+        elif orn == 3:
             for i in trsct:
-                xMax = int(xt[i][0])
+                x = int(xt[i][0])
+                if 'roi_points' not in stationInfo:
+                    yMax = int(yt[i][0]) # JWL flipped these for new cocoabeach station config
+                    yMin = int(yt[i][1]) # JWL flipped these for new cocoabeach station config
+                else:
+                    yMax = int(yt[i][1]) # flipped for the Ferry Beach station config
+                    yMin = int(yt[i][0]) # flipped for the Ferry Beach station config
+                y = yMax - yMin
+                y = abs(y)
+                print(f"shape of y: {y}")
+                yList[i] = np.zeros(shape=y)
+                val = [0]*y
+                for j in range(len(val)):
+                    k = yMin + j
+                    val[j] = rmb[k][x]
+                val = np.array(val)
+                values[i] = val
+            # reverse the values for orn == 3
+            revValues = [val[::-1] for val in values]
+            idx = [0]*len(xt)
+            xPt = [0]*len(xt)
+            yPt = [0]*len(xt)
+            for i in range(len(revValues)):
+                idx[i] = find_first_exceeding_index(revValues[i], thresh_otsu)
+                if idx[i] is None:
+                    yPt[i] = None
+                    xPt[i] = None
+                else:
+                    yPt[i] = max(yt[i]) - idx[i]
+                    xPt[i] = int(xt[i][0])
+            shoreline = np.vstack((xPt, yPt)).T
+        # for orn == 1 or 2
+        else:
+            for i in trsct:
+                xMax = int(xt[i][1])  # JWL chnged this from 0 Jeanettes ok, still ok for Oak Island
                 y = int(yt[i][0])
-                yList[i] = np.full(shape=xMax, fill_value= y)
+                yList[i] = np.full(shape=xMax, fill_value=y)
                 xList[i] = np.arange(xMax)
                 values[i] = rmb[y][0:xMax]
                 revValues[i] = rmb[y][::-1]
 
-            # intersect = [0]*len(yt)
             idx = [0]*len(yt)
             xPt = [0]*len(yt)
             yPt = [0]*len(yt)
-            # Checks revValues againts thresh_otsu.
-            for i in range(0, len(revValues)):
+            for i in range(len(revValues)):
                 idx[i] = find_first_exceeding_index(values[i], thresh_otsu)
                 xPt[i] = idx[i]
                 yPt[i] = int(yt[i][0])
-                shoreline = np.vstack((xPt, yPt)).T
+            shoreline = np.vstack((xPt, yPt)).T
 
         slVars = {
             'Station Name': stationname,
             'Date': str(date),
             'Time Info': str(dtInfo),
-            'Thresh': thresh,
-            'Otsu Threshold': thresh_otsu,
-            'Shoreline Transects': slTransects,
-            'Threshold Weightings': thresh_weightings,
-            'Shoreline Points': shoreline
+            'Thresh': float(thresh),
+            'Otsu Threshold': float(thresh_otsu),
+            'Shoreline Transects': {
+                'x': xt.tolist(),
+                'y': yt.tolist()
+            },
+            'Threshold Weightings': [float(w) for w in thresh_weightings],
+            'Shoreline Points': [[float(item) if item is not None else None for item in point] for point in shoreline]
         }
 
         try:
@@ -218,13 +288,9 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         except Exception:
             pass
 
-        if isinstance( slVars['Shoreline Transects']['x'], np.ndarray ):
+        if isinstance(slVars['Shoreline Transects']['x'], np.ndarray):
             slVars['Shoreline Transects']['x'] = slVars['Shoreline Transects']['x'].tolist()
             slVars['Shoreline Transects']['y'] = slVars['Shoreline Transects']['y'].tolist()
-        else:
-            pass
-
-        slVars['Shoreline Points'] = slVars['Shoreline Points'].tolist()
 
         # JAR: Don't emit the JSON file here, instead return the slVars to the
         # calling function along with the shoreline points.
@@ -237,15 +303,31 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
     @classmethod
     def pltFig_tranSL( cls, stationInfo, photo, tranSL):
-        # Creates shoreline product.
         stationname = stationInfo['Station Name']
         # dtInfo = stationInfo['Datetime Info']
         # date = str(dtInfo.date())
-        # time = str(dtInfo.hour) + str(dtInfo.minute)
+        # time = str(dtInfo.hour).zfill(2) + str(dtInfo.minute).zfill(2)  # Ensure two digits for hour and minute
         Di = stationInfo['Dune Line Info']
-        duneInt = Di['Dune Line Interpolation']
-        xi, py = duneInt[:, 0], duneInt[:, 1]
-        plt.ioff()
+        # duneInt = Di['Dune Line Interpolation']
+        duneInt = Di['Dune Line Points']
+        xi, py = duneInt[:,0], duneInt[:,1]
+        tranSL = np.array(tranSL, dtype=np.float64)
+
+        # Filter rows with NaN values
+        valid_mask = ~np.isnan(tranSL).any(axis=1)
+        tranSL = tranSL[valid_mask]
+
+        # Sort based on orientation
+        if len(tranSL) > 0:  # Only sort if we have valid points
+            if stationInfo['Orientation'] in [0, 3]:
+                tranSL = tranSL[np.argsort(tranSL[:, 0])]
+            elif stationInfo['Orientation'] in [1, 2]:
+                tranSL = tranSL[np.argsort(tranSL[:, 1])]
+        else:
+            # print("Warning: No valid shoreline points after filtering")
+            # print(f"Sorted tranSL coordinates: {tranSL}")
+            plt.ioff()
+
         fig_tranSL = plt.figure()
         plt.imshow(photo, interpolation='nearest')
         plt.xlabel("Image Width (pixels)", fontsize=10)
@@ -257,7 +339,8 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
         plt.title(
             (
                 'Transect Based Shoreline Detection (Time Averaged)\n'
-                + stationname
+                + stationname.capitalize()
+                # + ' on ' + date + ' at ' + time[:2] + ':' + time[2:] + ' UTC'
             ),
             fontsize = 12
         )
@@ -298,7 +381,18 @@ class ShorelineOtsuMethodV1Implementation(AbstractShorelineImplementation):
 
         photoAvg = frame
 
+        # By default, resize to 30% original size
         new_size = (int(photoAvg.shape[1] * 0.3), int(photoAvg.shape[0] * 0.3))
+        # Unless otherwise defined in station config
+        if 'Image Resize' in stationInfo:
+            resize_factor = stationInfo['Image Resize']
+            # convert to float from string
+            resize_factor = float(resize_factor) / 100
+            # Check if resize_factor is a valid number between 0 and 1
+            if isinstance(resize_factor, (int, float)) and 0 < resize_factor <= 1:
+                # Resize the image
+                new_size = (int(photoAvg.shape[1] * resize_factor), int(photoAvg.shape[0] * resize_factor))
+
         resized_image = cv2.resize(photoAvg, new_size, interpolation=cv2.INTER_AREA)
 
         # Creating an array version of image dimensions for plotting.
